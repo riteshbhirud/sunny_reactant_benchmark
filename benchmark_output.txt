@@ -1,0 +1,22 @@
+==============================================================================
+Julia 1.12.4 | Reactant v0.2.267 | KernelAbstractions v0.9.41 | LoopVectorization v0.12.174
+CPU allocation (nproc) = 4   |   JULIA_NUM_THREADS = 4 (LV @tturbo parallelism)
+CPU model: Intel(R) Xeon(R) Silver 4214R CPU @ 2.40GHz
+==============================================================================
+
+ms/call (BenchmarkTools @belapsed); all five correct vs a plain-Julia oracle.
+
+N     vec_len | LV@tturbo  Re-dg     Re-bmm    Re-reduce | KA-PoCL   | Re-dg / LV
+--------------------------------------------------------------------------------------------
+200   800     | 0.046      0.672     0.647     0.616     | 0.156     | 15×
+600   1800    | 0.946      19.559    21.872    20.865    | 3.065     | 21×
+1500  800     | 1.134      19.492    19.099    18.253    | 3.050     | 17×
+1500  1800    | 3.745      57.330    55.773    52.906    | 9.089     | 15×
+1500  3600    | 7.700      112.804   112.645   119.430   | 21.214    | 15×
+
+Effective CPU utilization @ N=1500 vec_len=3600 (all under the same 4-CPU allocation):
+  LV @tturbo :  392% CPU (~3.9 cores)
+  Re-dg (XLA):  170% CPU (~1.7 cores)
+  KA-PoCL    :  390% CPU (~3.9 cores)
+
+BENCHMARK_DONE
