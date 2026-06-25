@@ -1,12 +1,12 @@
-# Reactant.jl on a batched complex dot-product (Sunny.jl KPM hot path) — CPU benchmark
+# Reactant.jl on a batched complex dot-product (Sunny.jl KPM hot path) —- CPU benchmark
 
 A small, self-contained benchmark of one kernel pattern from **Sunny.jl** (a Julia library for
-magnetic neutron-scattering / spin-wave theory). We are exploring whether Reactant is a good fit for
+magnetic neutron-scattering / spin-wave theory). Exploring whether Reactant is a good fit for
 Sunny's GPU/CPU acceleration, and on CPU we see Reactant's XLA backend running this pattern markedly
-slower than a hand-vectorized `LoopVectorization` loop. We'd like a Reactant maintainer's read on
+slower than a hand-vectorized `LoopVectorization` loop. The goal is to confirm
 whether that gap is fundamental to the current CPU backend or a configuration we've missed.
 
-This directory is standalone — it does **not** depend on Sunny.jl. The kernel is inlined as a
+This directory is standalone -- it does not depend on Sunny.jl. The kernel is inlined as a
 minimal reproducer.
 
 ## The operation
@@ -81,7 +81,7 @@ decomposes into roughly a ~2.3× lower CPU parallel efficiency (1.7 vs 3.9 cores
 This is a CPU report, but for fairness: on an RTX 2080 Ti the kernel-free Reactant `dot_general`
 *beats* our current hand-written KA kernel for large sizes (up to ~3.6× complex / ~6× real at
 N=1500/vec_len=3600), while losing at small sizes. (Part of that is our KA kernel being under-tuned —
-64 threads/chain.) So this is not "Reactant is slow" — it is specifically the **CPU** backend on this
+64 threads/chain.) So this is not "Reactant is slow", it is specifically the **CPU** backend on this
 batched-reduction shape that we're asking about.
 
 ## The blocker we hit trying `raise=true` on the production kernel (GPU)
@@ -133,7 +133,7 @@ So the `reduce` idiom is rewritten into the same `dot_general` as the explicit o
 three Reactant forms have the same CPU performance. We benchmark all three so the comparison can't be
 dismissed as "you used the wrong idiom."
 
-## What we'd like to know
+## Points of Interest
 
 1. Is XLA's CPU `dot_general` reaching only ~1.7 of 4 cores expected for a **batched** dot of this
    shape (many small `(1×vec_len)·(vec_len×1)` contractions), or is there a thread-pool / Eigen
@@ -144,8 +144,6 @@ dismissed as "you used the wrong idiom."
    missing something (layout, precision flags, `donated_args`, etc.)?
 3. Any guidance on the `@localmem` raising path (the `!llvm.ptr<3>` error) — is shared-memory kernel
    raising on a roadmap, or is the kernel-free rewrite the intended route?
-
-We're happy to run any configuration you suggest and report back.
 
 ## How to run
 
@@ -163,9 +161,3 @@ JULIA_NUM_THREADS=4 julia --project=. benchmark.jl
 - KA-PoCL: `@belapsed (kernel!(OpenCLBackend(),64)(...); KernelAbstractions.synchronize(be))`.
 - Correctness: every method `≈` a plain-Julia oracle (`rtol` 1e-7..1e-8).
 - CPU utilization: utime+stime delta from `/proc/self/stat` over a fixed-count hot loop ÷ wall time.
-
-## Provenance / version note
-The broader exploration this came from used Reactant v0.2.266; this self-contained env resolved to
-v0.2.267 (one patch newer). Both show the same behavior. CPU benchmarks are 4-thread on the Xeon
-4214R allocation above; on a larger allocation the absolute numbers change but the LV-vs-Reactant
-ratio and the ~1.7-core XLA utilization were stable in our testing.
