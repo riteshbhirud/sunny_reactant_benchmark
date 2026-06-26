@@ -6,7 +6,7 @@ Sunny's GPU/CPU acceleration, and on CPU we see Reactant's XLA backend running t
 slower than a hand-vectorized `LoopVectorization` loop. We'd like a Reactant maintainer's read on
 whether that gap is fundamental to the current CPU backend or a configuration we've missed.
 
-This directory is standalone — it does **not** depend on Sunny.jl. The kernel is inlined as a
+This directory is standalone, it does **not** depend on Sunny.jl. The kernel is inlined as a
 minimal reproducer.
 
 ## The operation
