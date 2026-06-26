@@ -6,7 +6,7 @@ Sunny's GPU/CPU acceleration, and on CPU we see Reactant's XLA backend running t
 slower than a hand-vectorized `LoopVectorization` loop. We'd like a Reactant maintainer's read on
 whether that gap is fundamental to the current CPU backend or a configuration we've missed.
 
-This directory is standalone, it does **not** depend on Sunny.jl. The kernel is inlined as a
+This directory is standalone, it does not depend on Sunny.jl. The kernel is inlined as a
 minimal reproducer.
 
 ## The operation
@@ -25,12 +25,12 @@ not involved — N/A.)
 
 ## Methods (all ComplexF64; correctness checked against a plain-Julia oracle)
 
-1. **`LoopVectorization @tturbo`** — CPU-SIMD baseline. LV has no native complex, so it is fed the
+1. **`LoopVectorization @tturbo`** -- CPU-SIMD baseline. LV has no native complex, so it is fed the
    mathematically-equivalent split real/imag form (`conj(a)*b`: `re = ar·br + ai·bi`,
    `im = ar·bi − ai·br`). This is the strongest tuned CPU baseline.
-2. **`Reactant Ops.dot_general`** — the StableHLO batched-dot primitive (`batching_dimensions`).
+2. **`Reactant Ops.dot_general`** -- the StableHLO batched-dot primitive (`batching_dimensions`).
 3. **`Reactant NNlib.batched_mul`** — another path that lowers to `dot_general`.
-4. **`Reactant sum(conj(a).*b; dims=2)`** — the array-reduce idiom (included to show idiom-independence).
+4. **`Reactant sum(conj(a).*b; dims=2)`** -- the array-reduce idiom (included to show idiom-independence).
 5. **`Direct KernelAbstractions @kernel` via OpenCL/PoCL** — the production kernel form (workgroup
    reduction with `@localmem`), compiled through PoCL on CPU.
 
@@ -58,7 +58,7 @@ ms / call (`@belapsed`):
   on CPU the idiom choice does not matter (they compile to the same optimized program; see below).
 - All Reactant forms are **~15–21× slower than `@tturbo`** here (up to ~33× at the smallest sizes in
   our broader 24-cell sweep).
-- The PoCL KA kernel is ~4–6× faster than Reactant but still ~2.5–3.5× slower than `@tturbo`.
+- The PoCL KA kernel is ~4–6× faster than Reactant but still ~2.5-3.5× slower than `@tturbo`.
 
 ### CPU utilization (this is why the comparison is fair)
 
@@ -81,12 +81,10 @@ decomposes into roughly a ~2.3× lower CPU parallel efficiency (1.7 vs 3.9 cores
 This is a CPU report, but for fairness: on an RTX 2080 Ti the kernel-free Reactant `dot_general`
 *beats* our current hand-written KA kernel for large sizes (up to ~3.6× complex / ~6× real at
 N=1500/vec_len=3600), while losing at small sizes. (Part of that is our KA kernel being under-tuned —
-64 threads/chain.) So this is not "Reactant is slow" — it is specifically the **CPU** backend on this
-batched-reduction shape that we're asking about.
-
+64 threads/chain.)
 ## The blocker we hit trying `raise=true` on the production kernel (GPU)
 
-We tried Reactant's headline path — consuming the existing KA kernel via `@compile raise=true` —
+We tried Reactant's headline path, consuming the existing KA kernel via `@compile raise=true`,
 but it fails because the kernel uses shared memory (`@localmem`/`@synchronize`). A copy kernel
 *without* shared memory raises fine; *with* `@localmem` it fails (verified in Float64, so not a
 complex issue):
@@ -138,29 +136,28 @@ dismissed as "you used the wrong idiom."
 1. **Multicore scaling.** XLA's CPU `dot_general` uses ~1.7 of the 4 allocated cores on this shape
    (many small `(1×vec_len)·(vec_len×1)` contractions), while `@tturbo` and the PoCL kernel both
    saturate ~3.9. We found no documented Reactant environment variable for CPU intra-op threads (only
-   GPU mem-fraction / preallocate / visible-devices are exposed). Two specific questions: (a) does
-   XLA's CPU thread pool respect a cgroup CPU limit, or does it size itself from the node's 24
+   GPU mem-fraction / preallocate / visible-devices are exposed).
+   Two specific questions:
+   (a) does XLA's CPU thread pool respect a cgroup CPU limit, or does it size itself from the node's 24
    physical / 48 logical cores on this 2-socket box (i.e. could a mis-sized pool explain the
    ~1.7-core result)? (b) Is there an intra-op-threads or `XLA_FLAGS` setting we should pass? We
    currently set no `XLA_FLAGS`.
 
-2. **Per-core throughput.** Independent of parallelism, per-core throughput is ~6–7× below the
+3. **Per-core throughput.** Independent of parallelism, per-core throughput is ~6–7× below the
    hand-vectorized loop. This op has low arithmetic intensity (≈2 loads per multiply-add, so
-   effectively bandwidth-bound), yet `@tturbo` still scales to ~3.9 cores on the identical operation —
+   effectively bandwidth-bound), yet `@tturbo` still scales to ~3.9 cores on the identical operation --
    so the question is specifically why XLA's CPU backend both under-parallelizes and trails per core
    on this batched-reduction pattern. Are we missing a layout, precision, or `donated_args` setting?
 
-3. **Layout.** Our arrays are `(N_chains, vec_len)` (column-major → the contracted `vec_len`
+4. **Layout.** Our arrays are `(N_chains, vec_len)` (column-major → the contracted `vec_len`
    dimension is non-contiguous per chain), and the `optimize=true` HLO operates on the data as
    `(vec_len, N_chains)` — the row-major view of the same bytes (no `stablehlo.transpose` op; a free
    reinterpretation). Would storing the data so the contraction dimension is contiguous materially
    change the CPU numbers, or is that reorganization already free?
 
-4. **`@localmem` raising.** Any guidance on the shared-memory raising path (the `!llvm.ptr<3>`
-   error) — is shared-memory kernel raising on a roadmap, or is the kernel-free rewrite the intended
+5. **`@localmem` raising.** Any guidance on the shared-memory raising path (the `!llvm.ptr<3>`
+   error): is shared-memory kernel raising on a roadmap, or is the kernel-free rewrite the intended
    route for kernels like this?
-
-We're happy to run any configuration you suggest and report back.
 
 ## How to run
 
@@ -178,9 +175,3 @@ JULIA_NUM_THREADS=4 julia --project=. benchmark.jl
 - KA-PoCL: `@belapsed (kernel!(OpenCLBackend(),64)(...); KernelAbstractions.synchronize(be))`.
 - Correctness: every method `≈` a plain-Julia oracle (`rtol` 1e-7..1e-8).
 - CPU utilization: utime+stime delta from `/proc/self/stat` over a fixed-count hot loop ÷ wall time.
-
-## Provenance / version note
-The broader exploration this came from used Reactant v0.2.266; this self-contained env resolved to
-v0.2.267 (one patch newer). Both show the same behavior. All numbers here are from the 4-CPU Xeon
-4214R allocation above; we did not test larger allocations, so absolute times (and possibly the
-ratios) may differ on other hardware — which is exactly why this is packaged for you to run.
