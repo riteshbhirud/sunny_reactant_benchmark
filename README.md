@@ -82,8 +82,7 @@ decomposes into roughly a ~2.3× lower CPU parallel efficiency (1.7 vs 3.9 cores
 This is a CPU report, but for fairness: on an RTX 2080 Ti the kernel-free Reactant `dot_general`
 *beats* our current hand-written KA kernel for large sizes (up to ~3.6× complex / ~6× real at
 N=1500/vec_len=3600), while losing at small sizes. (Part of that is our KA kernel being under-tuned:
-64 threads/chain.) So this is not "Reactant is slow"; it is specifically the **CPU** backend on this
-batched-reduction shape that we're asking about.
+64 threads/chain.)
 
 ## The blocker we hit trying `raise=true` on the kernel (GPU)
 
