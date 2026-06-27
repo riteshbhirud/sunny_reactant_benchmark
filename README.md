@@ -2,7 +2,7 @@
 
 A small, self-contained benchmark of one kernel pattern from **Sunny.jl** (a Julia library for
 magnetic neutron-scattering / spin-wave theory). We are exploring whether Reactant is a good fit for
-Sunny's GPU/CPU acceleration, and on CPU we see Reactant's XLA backend running this pattern markedly
+Sunny's GPU/CPU acceleration, and on CPU we see Reactant's XLA backend running this pattern
 slower than a hand-vectorized `LoopVectorization` loop. We'd like a Reactant maintainer's read on
 whether that gap is fundamental to the current CPU backend or a configuration we've missed.
 
